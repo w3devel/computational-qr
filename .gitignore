@@ -341,6 +341,7 @@ paket-files/
 
 # Rust build artifacts
 rust/*/target/
+target/
 # wasm-pack output (built, not committed)
 rust/*/pkg/
 
