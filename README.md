@@ -44,8 +44,13 @@ computational_qr/
 │   └── video_qr.py         # Animated SVG video QR
 ├── quantum/
 │   └── quantum_math.py     # QuantumState, QuantumGate, QuantumRegister, QuantumMath
-└── database/
-    └── neo4j_store.py      # Neo4jStore with real + mock backends
+├── database/
+│   └── neo4j_store.py      # Neo4jStore with real + mock backends
+└── comms/
+    ├── capsule.py          # Versioned Capsule format + serialization
+    ├── qr_transport.py     # Pattern A – multi-frame QR / video-QR framing
+    ├── wifi_transport.py   # Pattern B – Wi-Fi LAN HTTP transport + UDP discovery
+    └── i2p_transport.py    # Pattern C – I2P gateway client
 ```
 
 ---
@@ -268,8 +273,173 @@ to always group by range instead of collapsing to the sheet level.
 pytest tests/ -v
 ```
 
-All 292 tests pass with no external services required (Neo4j mock is used
-automatically for database tests).
+All tests pass with no external services required (Neo4j mock is used
+automatically for database tests; comms tests use in-process mock servers).
+
+---
+
+## Communications subsystem (`comms`)
+
+The `comms` package adds three **transport patterns** for moving a shared,
+versioned *Capsule* through different communication channels.  All patterns
+share the same :class:`Capsule` envelope and are independent of the existing
+colour-geometry / audio / video / quantum features.
+
+### The Capsule format
+
+A `Capsule` is a transport-oriented, versioned message envelope:
+
+```python
+from computational_qr.comms import Capsule
+
+capsule = Capsule(
+    payload=b"hello world",
+    content_type="text",
+    routing={"topic": "greetings"},
+)
+
+# Serialize (canonical JSON – deterministic, sort_keys=True)
+json_str = capsule.to_json()
+raw_bytes = capsule.to_bytes()
+
+# Deserialize and verify integrity
+restored = Capsule.from_bytes(raw_bytes)
+assert restored.payload == b"hello world"
+assert restored.verify()        # SHA-256 checksum check
+```
+
+The serialised form includes `version`, `msg_id` (UUID4), `created_at_ms`
+(millisecond timestamp), `routing` dict, `content_type`, `payload_b64`
+(base64url), and `checksum` (SHA-256 hex).  Encoding is always
+**deterministic**: given identical field values the JSON output is identical
+on every platform.
+
+---
+
+### Pattern A – Multi-frame QR / Video-QR
+
+Split a `Capsule` into fixed-size chunks, encode each chunk as a
+`QRData` frame, and reassemble in any order.  Compatible with
+`QREncoder` (static QR) and `VideoQR` (animated SVG).
+
+```python
+from computational_qr.comms import Capsule, QRFramer
+from computational_qr.media import VideoQR
+
+capsule = Capsule(payload=b"A" * 600, content_type="bytes")
+framer = QRFramer(chunk_size=200)   # max 200 capsule-bytes per QR frame
+
+# Split into QRData envelopes (one per frame)
+qr_items = framer.to_qr_data(capsule)
+print(f"{len(qr_items)} QR frames needed")
+
+# Animate as a video QR (no real scanner required for this step)
+vqr = VideoQR()
+svg = vqr.encode_video(qr_items)
+
+# Reassemble from raw QRFrame objects (any order)
+frames = framer.split(capsule)
+import random; random.shuffle(frames)
+restored = framer.reassemble(frames)
+assert restored.payload == capsule.payload
+```
+
+---
+
+### Pattern B – Wi-Fi LAN transport (gateway concept)
+
+A *gateway node* on the local IP network (Wi-Fi, Ethernet, or any link)
+runs a `CapsuleServer`.  Sender devices POST capsules to it over HTTP.
+The underlying link does not have to be Wi-Fi 3; the module works on any
+IP LAN.
+
+```python
+from computational_qr.comms import Capsule, CapsuleServer, WifiGatewayClient
+
+# ── Gateway side ──────────────────────────────────────────────────────────
+server = CapsuleServer(host="0.0.0.0", port=8765)   # binds to all interfaces
+server.start()
+
+# Optionally persist incoming capsules to disk:
+# server = CapsuleServer(host="0.0.0.0", port=8765, spool_dir="/var/spool/cqrc")
+
+# ── Sender side ───────────────────────────────────────────────────────────
+client = WifiGatewayClient("http://192.168.1.10:8765/capsule")
+capsule = Capsule(payload=b"hello LAN", content_type="text")
+result = client.send(capsule)
+print(result)   # {"status": "ok", "msg_id": "..."}
+
+# ── Gateway retrieves spooled capsules ────────────────────────────────────
+received = server.get_capsules()
+server.stop()
+```
+
+**Optional UDP gateway discovery** (multicast; can be disabled for tests):
+
+```python
+from computational_qr.comms import udp_announce, udp_listen
+
+# Gateway announces itself on the LAN
+udp_announce(service_port=8765)
+
+# Sender discovers the gateway
+port = udp_listen(timeout=2.0)   # returns None if no announcement received
+if port:
+    print(f"Gateway found on port {port}")
+```
+
+---
+
+### Pattern C – I2P gateway
+
+An *I2P gateway* is a separate process (or remote host) that runs an I2P
+router and exposes a small HTTP API.  This module provides a typed client
+for that gateway contract; it does **not** implement I2P internals.
+
+```python
+from computational_qr.comms import Capsule, I2PGatewayClient
+
+client = I2PGatewayClient("http://localhost:7070")
+
+# Submit a capsule for delivery via I2P
+capsule = Capsule(
+    payload=b"secret message",
+    content_type="otp_ciphertext",
+    routing={
+        "i2p_dest": "somehash.b32.i2p",   # I2P destination address
+        "topic": "inbox_alice",             # mailbox/topic label
+    },
+)
+result = client.submit(capsule)
+print(result)   # {"status": "queued", "msg_id": "..."}
+
+# Fetch pending capsules from a mailbox
+pending = client.fetch_mailbox("inbox_alice")
+for c in pending:
+    print(c.text_payload())
+```
+
+**Gateway contract** (implement separately or use a community gateway):
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/i2p/submit` | POST | Accept a capsule JSON body; returns `{"status":"queued","msg_id":"..."}` |
+| `/i2p/mailbox/<topic>` | GET | Return `{"topic":"...","capsules":[...]}` |
+
+---
+
+### Pattern B/C – the "gateway" concept
+
+Both Pattern B and Pattern C rely on a *gateway service*:
+
+* **Pattern B gateway** is a `CapsuleServer` (bundled) running on any LAN
+  node.  No external service needed for local delivery.
+* **Pattern C gateway** is an I2P-router node with the HTTP API above.
+  Devices that cannot run a full I2P router submit capsules to it over the
+  local LAN (possibly using Pattern B) and the gateway forwards them via I2P.
+
+The patterns compose: scan a QR code (Pattern A) → upload over Wi-Fi LAN
+(Pattern B) → gateway forwards via I2P (Pattern C).
 
 ---
 
