@@ -59,7 +59,8 @@ impl StateVec {
         let local_dim = 1 << k;
         if mat.dim != local_dim {
             return Err(format!(
-                "Gate matrix dim {local_dim} != 2^(targets.len()) = {local_dim}"
+                "Gate matrix dim {} != 2^(targets.len()) = {local_dim}",
+                mat.dim
             ));
         }
         for t in targets {
@@ -225,13 +226,9 @@ mod tests {
     #[test]
     fn custom_hadamard_matches_standard() {
         let inv_sqrt2 = std::f64::consts::FRAC_1_SQRT_2;
-        let custom = format!(
-            r#"{{"nQubits":1,"ops":[{{"gate":{{"name":"H_custom","matrix":{{"dim":2,"data":[[{s},0],[{s},0],[{s},0],[{neg},{neg}]]}}}},"targets":[0]}}]}}"#,
-            s = inv_sqrt2,
-            neg = -inv_sqrt2,
-        );
-        // Note: the above uses the wrong data format; let's fix with a proper JSON string.
-        let correct_json = format!(
+        let neg = -inv_sqrt2;
+        let s = inv_sqrt2;
+        let json = format!(
             r#"{{
                 "nQubits": 1,
                 "ops": [{{
@@ -245,10 +242,8 @@ mod tests {
                     "targets": [0]
                 }}]
             }}"#,
-            s = inv_sqrt2,
-            neg = -inv_sqrt2,
         );
-        let p_custom = probs(&correct_json);
+        let p_custom = probs(&json);
         let p_named = probs(r#"{"nQubits":1,"ops":[{"gate":"H","targets":[0]}]}"#);
         assert!((p_custom[0] - p_named[0]).abs() < 1e-12);
         assert!((p_custom[1] - p_named[1]).abs() < 1e-12);
