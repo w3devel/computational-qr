@@ -46,11 +46,15 @@ computational_qr/
 │   └── quantum_math.py     # QuantumState, QuantumGate, QuantumRegister, QuantumMath
 ├── database/
 │   └── neo4j_store.py      # Neo4jStore with real + mock backends
-└── comms/
-    ├── capsule.py          # Versioned Capsule format + serialization
-    ├── qr_transport.py     # Pattern A – multi-frame QR / video-QR framing
-    ├── wifi_transport.py   # Pattern B – Wi-Fi LAN HTTP transport + UDP discovery
-    └── i2p_transport.py    # Pattern C – I2P gateway client
+├── comms/
+│   ├── capsule.py          # Versioned Capsule format + serialization
+│   ├── qr_transport.py     # Pattern A – multi-frame QR / video-QR framing
+│   ├── wifi_transport.py   # Pattern B – Wi-Fi LAN HTTP transport + UDP discovery
+│   └── i2p_transport.py    # Pattern C – I2P gateway client
+└── numberstation/
+    ├── e11_script.py       # E11Script dataclass, generate(), CLI entry point
+    ├── render.py           # WAV synthesis from E11Script (stdlib-only)
+    └── ffmpeg.py           # Pipe WAV to ffmpeg-qr; auto-select APNG/PNG/WAV output
 ```
 
 ---
@@ -442,6 +446,99 @@ The patterns compose: scan a QR code (Pattern A) → upload over Wi-Fi LAN
 (Pattern B) → gateway forwards via I2P (Pattern C).
 
 ---
+
+---
+
+## Number-station module (`numberstation`)
+
+Generate deterministic **E11 number-station scripts** compatible with the
+[ZapdoZ/numberstations](https://github.com/ZapdoZ/numberstations) input
+format, render WAV audio from those scripts, and pipe the audio to a custom
+`ffmpeg-qr` binary.
+
+### Generating a script
+
+```python
+from computational_qr.numberstation import generate
+
+# From a human-readable string seed (SHA-256 derived integer internally):
+script = generate("my-secret-seed", group_count=20)
+print(script.to_text())
+# E11
+# 472
+# 20
+# 03917 48201 … (20 five-digit groups)
+
+# From an integer seed:
+script2 = generate(98765, group_count=10)
+
+# Write to a file (compatible with ZapdoZ/numberstations/main.py):
+script.write("transmission.txt")
+```
+
+### CLI usage
+
+```bash
+# Write to stdout:
+python -m computational_qr.numberstation.e11_script \
+    --seed "my-secret-seed" --groups 20
+
+# Write to a file:
+python -m computational_qr.numberstation.e11_script \
+    --seed "my-secret-seed" --groups 20 --out transmission.txt
+
+# Fixed station ID:
+python -m computational_qr.numberstation.e11_script \
+    --seed 12345 --groups 5 --station-id 007
+```
+
+### Rendering WAV audio
+
+```python
+from computational_qr.numberstation import generate
+from computational_qr.numberstation.render import render_wav
+
+script = generate("my-secret-seed", group_count=20)
+wav_bytes = render_wav(script, sample_rate=48000)
+
+# Or get raw PCM:
+pcm_bytes = render_wav(script, as_pcm=True)
+```
+
+### Piping to `ffmpeg-qr`
+
+`ffmpeg-qr` (your custom FFmpeg binary) receives the WAV on stdin.  The output
+format is chosen automatically:
+
+| Condition | Output |
+|---|---|
+| `apngasm` is on PATH | Animated PNG (APNG) |
+| `sng` is on PATH | PNG sequence (`frame_%05d.png`) |
+| Neither | WAV fallback |
+
+```python
+from computational_qr.numberstation import generate
+from computational_qr.numberstation.render import render_wav
+from computational_qr.numberstation.ffmpeg import transcode, detect_output_format
+
+script = generate("broadcast-2026-03-21", group_count=30)
+wav_bytes = render_wav(script)
+
+print("Output format:", detect_output_format())  # "apng", "png_sequence", or "wav"
+
+# Auto-select output format:
+transcode(wav_bytes, out_path="output.apng", ffmpeg_qr_path="/path/to/ffmpeg-qr")
+
+# Force a specific format:
+transcode(
+    wav_bytes,
+    out_path="output.apng",
+    ffmpeg_qr_path="/path/to/ffmpeg-qr",
+    output_format="apng",
+    fps=12,
+    scale="512:512",
+)
+```
 
 ---
 
