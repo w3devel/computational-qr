@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
+  <Version>0.1.0.0</Version>
+  <ProviderName>computational-qr</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Quantum Gate Simulator" />
+  <Description DefaultValue="Apply quantum gate sequences and return probabilities or amplitudes as dynamic arrays." />
+
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/dist/functions.js" />
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <AllFormFactors>
+          <ExtensionPoint xsi:type="CustomFunctions">
+            <Script>
+              <SourceLocation resid="residFunctions" />
+            </Script>
+            <Page>
+              <SourceLocation resid="residFunctions" />
+            </Page>
+            <Metadata>
+              <SourceLocation resid="residFunctions-metadata" />
+            </Metadata>
+            <Namespace resid="residNamespace" />
+          </ExtensionPoint>
+        </AllFormFactors>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Urls>
+        <bt:Url id="residFunctions" DefaultValue="https://localhost:3000/dist/functions.js" />
+        <bt:Url id="residFunctions-metadata" DefaultValue="https://localhost:3000/dist/functions.json" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="residNamespace" DefaultValue="CQ" />
+      </bt:ShortStrings>
+    </Resources>
+  </VersionOverrides>
+
+</OfficeApp>

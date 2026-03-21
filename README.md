@@ -443,6 +443,183 @@ The patterns compose: scan a QR code (Pattern A) → upload over Wi-Fi LAN
 
 ---
 
+---
+
+## Spreadsheet integration – quantum gate simulation (WASM)
+
+This repository includes an offline-first quantum gate-sequence simulator
+compiled to **WebAssembly** from Rust.  It can be used as:
+
+- **Excel** OfficeJS Custom Functions (`CQ_QPROBS`, `CQ_QAMPS`) that spill
+  dynamic arrays directly into worksheet cells.
+- **LibreOffice Calc** via a ZetaJS extension that loads the same JS + WASM
+  bundle (no macros required).
+
+The Python implementation in `computational_qr/quantum/quantum_math.py`
+remains the authoritative reference model.  Parity tests confirm that WASM
+results match Python for all supported circuits.
+
+### Repository layout (new additions)
+
+```
+rust/
+└── quantum_engine/          Rust crate → compiled to WASM by wasm-pack
+    ├── Cargo.toml
+    └── src/
+        ├── lib.rs           WebAssembly entry point (apply_gate_sequence)
+        ├── schema.rs        JSON input/output types (serde)
+        ├── gates.rs         Standard & custom gate matrices
+        └── engine.rs        State-vector simulation + unit tests
+
+spreadsheets/
+├── engine/
+│   ├── quantumEngine.ts     JS/TS wrapper – loads WASM, exposes qprobs/qamps
+│   └── run_wasm.mjs         Node.js runner for Python parity tests
+└── excel-officejs/
+    ├── manifest.xml         Office Add-in manifest
+    ├── package.json
+    ├── tsconfig.json
+    ├── webpack.config.js
+    └── src/
+        └── functions.ts     CQ_QPROBS / CQ_QAMPS custom function definitions
+
+docs/
+└── native-server-fallback.md  Fallback design when WASM is unavailable
+
+tests/
+└── test_wasm_parity.py      WASM-vs-Python parity tests (+ shape-logic tests)
+```
+
+### Building the WASM module
+
+Prerequisites: [Rust](https://rustup.rs) + [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/).
+
+```bash
+# Install wasm-pack (one-time)
+cargo install wasm-pack
+
+# Build the WASM package (Node.js target for parity tests)
+cd rust/quantum_engine
+wasm-pack build --target nodejs
+
+# Build for browser/bundler (Excel add-in)
+wasm-pack build --target bundler
+```
+
+The compiled package is emitted to `rust/quantum_engine/pkg/`.
+
+### Running the parity tests
+
+```bash
+# After building the WASM Node.js target (above):
+pytest tests/test_wasm_parity.py -v
+```
+
+WASM tests are automatically **skipped** (not failed) when the WASM package
+has not been built, so CI runs without Rust/wasm-pack always succeed.
+
+### Using the Excel add-in
+
+1. Build the WASM bundler package (see above).
+2. Install Node.js dependencies and build the add-in:
+   ```bash
+   cd spreadsheets/excel-officejs
+   npm install
+   npm run build
+   ```
+3. Sideload `dist/manifest.xml` into Excel (Insert → Add-ins → Upload My
+   Add-in).
+
+#### Custom function examples
+
+```
+# 1-qubit Hadamard → [0.5, 0.5] as a row vector (default)
+=CQ_QPROBS(1, "[{""gate"":""H"",""targets"":[0]}]")
+
+# Bell state → column vector (with header row)
+=CQ_QPROBS(2,
+  "[{""gate"":""H"",""targets"":[0]},{""gate"":""CNOT"",""targets"":[0,1]}]",
+  ,
+  "{""shape"":""col"",""hasHeader"":true}")
+
+# Complex amplitudes (Re/Im two-column spill)
+=CQ_QAMPS(1, "[{""gate"":""H"",""targets"":[0]}]")
+
+# Custom matrix gate (Hadamard supplied as explicit 2×2 matrix)
+=CQ_QPROBS(1,
+  "[{""gate"":{""matrix"":{""dim"":2,""data"":[[0.707,0],[0.707,0],[0.707,0],[-0.707,0]]}},""targets"":[0]}]")
+```
+
+### Output shape rules for `CQ_QPROBS`
+
+The optional fourth argument accepts a JSON options object:
+
+```json
+{
+  "shape": "auto" | "row" | "col",
+  "hasHeader": true | false,
+  "leftColumnReserved": true | false
+}
+```
+
+| `shape`  | `hasHeader` | `leftColumnReserved` | Result |
+|----------|-------------|----------------------|--------|
+| `"col"`  | –           | –                    | N×1 column vector |
+| `"row"`  | –           | –                    | 1×N row vector |
+| `"auto"` | `true`      | `false`              | N×1 column vector |
+| `"auto"` | `false`     | –                    | 1×N row vector |
+| `"auto"` | –           | `true`               | 1×N row vector |
+
+**Default** (`"auto"` with no options): row vector.
+
+### JSON API schema
+
+Full input schema accepted by `apply_gate_sequence`:
+
+```json
+{
+  "nQubits": 2,
+  "initialState": { "type": "zero" },
+  "ops": [
+    { "gate": "H",    "targets": [0] },
+    { "gate": "CNOT", "targets": [0, 1] },
+    {
+      "gate": {
+        "name": "U",
+        "matrix": { "dim": 2, "data": [[0.707, 0.0], [0.707, 0.0], [0.707, 0.0], [-0.707, 0.0]] }
+      },
+      "targets": [0]
+    }
+  ],
+  "output": "probabilities"
+}
+```
+
+- `nQubits`: positive integer (max ~20 for practical use in spreadsheets).
+- `initialState`: `{"type":"zero"}` or `{"type":"amplitudes","data":[[re,im],...]}`.
+- `ops[].gate`: a string name (`"H"`, `"X"`, `"Y"`, `"Z"`, `"I"`, `"S"`, `"T"`,
+  `"CNOT"`, `"SWAP"`) **or** an inline matrix object.
+- `ops[].targets`: qubit indices.  **Qubit 0 = leftmost / most-significant bit**
+  (big-endian, matching the Python implementation).
+- `output`: `"probabilities"` (default) or `"amplitudes"`.
+
+### LibreOffice Calc (ZetaJS – future)
+
+The same `quantumEngine.ts` wrapper and WASM binary can be bundled into a
+LibreOffice extension using ZetaJS.  ZetaJS exposes a JS execution environment
+that can load WASM, enabling the same `qprobs`/`qamps` functions without
+macros.  This integration is planned as a future addition; the engine API
+is already compatible.
+
+### Native server fallback
+
+When WASM cannot be loaded (restricted environment, unsupported runtime), the
+JS wrapper emits a clear error message suggesting the user install the native
+Rust helper server.  See [docs/native-server-fallback.md](docs/native-server-fallback.md)
+for the design.
+
+---
+
 ## License
 
 GNU Affero General Public License v3 – see [LICENSE](LICENSE).
