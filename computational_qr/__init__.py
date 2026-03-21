@@ -3,12 +3,13 @@ computational_qr – QR as a computational medium.
 
 Modules
 -------
-core         Color geometry and base QR encoding utilities.
-graphs       3D graph visualisation with arbitrary data intersections.
-prolog       Prolog logic engine, encoder/decoder, and QR storage.
-media        Audio QR and SVG/video QR generation.
-quantum      Quantum-math primitives for QR state representation.
-database     Neo4j graph-database integration.
+core            Color geometry and base QR encoding utilities.
+graphs          3D graph visualisation with arbitrary data intersections.
+prolog          Prolog logic engine, encoder/decoder, and QR storage.
+media           Audio QR and SVG/video QR generation.
+quantum         Quantum-math primitives for QR state representation.
+database        Neo4j graph-database integration.
+numberstation   Deterministic E11 number-station script generation and rendering.
 """
 
 from importlib.metadata import version, PackageNotFoundError
@@ -25,4 +26,5 @@ __all__ = [
     "media",
     "quantum",
     "database",
+    "numberstation",
 ]
