@@ -45,7 +45,8 @@ computational_qr/
 ├── quantum/
 │   └── quantum_math.py     # QuantumState, QuantumGate, QuantumRegister, QuantumMath
 ├── database/
-│   └── neo4j_store.py      # Neo4jStore with real + mock backends
+│   ├── neo4j_store.py      # Neo4jStore with real + mock backends
+│   └── relational_store.py # RelationalQRStore: SQLite/Postgres via SQLAlchemy
 ├── comms/
 │   ├── capsule.py          # Versioned Capsule format + serialization
 │   ├── qr_transport.py     # Pattern A – multi-frame QR / video-QR framing
@@ -177,6 +178,41 @@ with Neo4jStore(use_mock=True) as store:
 # Real Neo4j connection
 # with Neo4jStore("bolt://localhost:7687", "neo4j", "password") as store:
 #     store.store_prolog_qr(qr_data, prolog_text)
+```
+
+### Relational store (SQLite / PostgreSQL)
+
+```python
+from computational_qr.database import RelationalQRStore
+from computational_qr.core import QRData, PayloadType
+
+data = QRData(PayloadType.TEXT, "hello relational")
+
+# --- SQLite (portable, no server required) ---
+with RelationalQRStore("sqlite:///qr.db") as store:
+    # Store with pre-rendered PNG and SVG artifacts
+    record = store.store_qr(data, render_png=True, render_svg=True)
+    print("UUID:", record.id)
+    print("Fingerprint:", record.fingerprint)
+
+    # Fast artifact retrieval (no re-rendering)
+    png_bytes = store.get_png(record.id)
+    svg_text  = store.get_svg(record.id)
+
+    # Look up by fingerprint
+    same = store.get_by_fingerprint(record.fingerprint)
+    assert same.id == record.id
+
+    # List (paginated, optional type filter)
+    rows = store.list_qr(limit=50, payload_type="text")
+    print(f"{len(rows)} text record(s)")
+
+# --- PostgreSQL (server-side) ---
+# with RelationalQRStore(
+#     "postgresql+psycopg://user:password@localhost/qrdb"
+# ) as store:
+#     record = store.store_qr(data)
+#     png_bytes = store.get_png(record.id)
 ```
 
 ---
