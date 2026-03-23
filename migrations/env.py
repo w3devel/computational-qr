@@ -16,6 +16,11 @@ if config.config_file_name is not None:
 
 # Import the relational store metadata for autogenerate support
 from computational_qr.database.relational_store import Base  # noqa: E402
+
+# Import spatial models so their tables are included in Alembic's metadata
+# when GeoAlchemy2 is installed (no-op otherwise).
+import computational_qr.database.spatial_models  # noqa: F401, E402
+
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

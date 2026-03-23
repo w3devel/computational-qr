@@ -32,6 +32,9 @@ orm = [
 postgres = [
     "psycopg[binary]>=3.2",
 ]
+postgis = [
+    "geoalchemy2>=0.15",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

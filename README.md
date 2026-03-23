@@ -217,6 +217,65 @@ with RelationalQRStore("sqlite:///qr.db") as store:
 
 ---
 
+### PostGIS-backed proximity / intersection queries (optional)
+
+For large point sets, the pure-Python O(n²) intersection loops in `Graph3D`
+and `ColorGeometry` can be offloaded to a PostGIS-enabled PostgreSQL database.
+
+#### Installation
+
+```bash
+pip install 'computational-qr[orm,postgres,postgis]'
+```
+
+#### Enable the PostGIS extension (one-off migration)
+
+```bash
+# Configure your database URL in alembic.ini or via an env var first, then:
+alembic upgrade head
+```
+
+This runs the bundled migration which:
+1. Enables the `postgis` extension.
+2. Creates `spatial_points_2d` (geometry `POINT`, SRID 0) and
+   `spatial_points_3d` (geometry `POINTZ`, SRID 0) with GiST indexes.
+
+#### Load points and query intersections
+
+```python
+import uuid
+from computational_qr.database import PostGISIntersectionStore
+from computational_qr.graphs import Graph3D
+
+# Build a graph as usual
+g = Graph3D(tolerance=1.0)
+g.register_dimension(0, "Temperature")
+g.register_dimension(1, "Pressure")
+g.add_point("T0", 1.0, 2.0, 0.5, value=25.0, dimension=0)
+g.add_point("P0", 1.1, 2.1, 0.4, value=101.3, dimension=1)
+g.add_point("T1", 5.0, 5.0, 5.0, value=30.0, dimension=0)
+
+# Load into PostGIS and query
+scene = uuid.uuid4()
+with PostGISIntersectionStore(
+    "postgresql+psycopg://user:pw@localhost/qrdb"
+) as store:
+    store.upsert_scene_points_3d(scene, g.points)
+    intersections = store.find_intersections_3d(
+        scene, tolerance=1.0, different_dimensions_only=True
+    )
+    for ix in intersections:
+        print(f"{ix.label}  dist={ix.distance:.4f}  mid={ix.midpoint}")
+```
+
+For 2-D colour-geometry shapes use `upsert_scene_points_2d` /
+`find_intersections_2d` (backed by `ST_DWithin`).
+
+The existing pure-Python `find_intersections()` methods continue to work
+unchanged without PostGIS.
+
+---
+
 ## Dependency intersection engine
 
 The dependency intersection engine models spreadsheet formulas as a directed
