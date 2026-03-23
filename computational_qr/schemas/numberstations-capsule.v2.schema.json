@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://example.org/schema/numberstations-capsule.v2.schema.json",
+  "title": "Number Stations QR Capsule (v2)",
+  "description": "Profile-agnostic payload for encoding a number-station transmission in a QR code.",
+  "type": "object",
+  "required": ["v", "content"],
+  "additionalProperties": false,
+  "properties": {
+    "v": {
+      "type": "string",
+      "enum": ["2"],
+      "description": "Capsule schema version. Must be \"2\"."
+    },
+
+    "profile": {
+      "type": "object",
+      "description": "Optional descriptor of the station style (e.g. ENIGMA E11).",
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": "string",
+          "description": "Broad format family, e.g. \"ENIGMA\"."
+        },
+        "id": {
+          "type": "string",
+          "description": "Station/format identifier, e.g. \"E11\"."
+        },
+        "variant": {
+          "type": "string",
+          "description": "Format variant, e.g. \"E11a\"."
+        },
+        "nickname": {
+          "type": "string",
+          "description": "Human-readable station nickname."
+        },
+        "voice": {
+          "type": "string",
+          "description": "Describing the voice style used (informational)."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Transmission mode, e.g. \"USB\"."
+        },
+        "location_hint": {
+          "type": "string",
+          "description": "Approximate origin location (informational)."
+        }
+      }
+    },
+
+    "content": {
+      "type": "object",
+      "description": "The canonical groups payload (required).",
+      "required": ["group_size", "groups"],
+      "additionalProperties": false,
+      "properties": {
+        "group_size": {
+          "type": "integer",
+          "enum": [4, 5],
+          "description": "Number of digits per group."
+        },
+        "groups": {
+          "type": "array",
+          "description": "Digit groups. Each element must be a string of digits whose length equals group_size.",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "group_size": { "const": 4 }
+                }
+              },
+              "then": {
+                "items": { "pattern": "^[0-9]{4}$" }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "group_size": { "const": 5 }
+                }
+              },
+              "then": {
+                "items": { "pattern": "^[0-9]{5}$" }
+              }
+            }
+          ]
+        },
+        "repeat": {
+          "type": "object",
+          "description": "Optional repetition policy for the groups block.",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["none", "repeat-block", "repeat-groups"]
+            },
+            "times": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How many times to repeat (total, including the first pass)."
+            }
+          }
+        },
+        "tokens": {
+          "type": "object",
+          "description": "Optional callup/closing tokens.",
+          "additionalProperties": false,
+          "properties": {
+            "attention": {
+              "type": "string",
+              "description": "Attention/callup token, e.g. \"ATTENTION\"."
+            },
+            "outro": {
+              "type": "string",
+              "description": "Closing token, e.g. \"OUT\"."
+            }
+          }
+        },
+        "preamble": {
+          "type": "array",
+          "description": "Optional preamble strings (e.g. station ID, group count announcement).",
+          "items": { "type": "string" }
+        },
+        "count_announce": {
+          "type": "boolean",
+          "description": "Whether to announce the group count before the groups."
+        }
+      }
+    },
+
+    "meta": {
+      "type": "object",
+      "description": "Optional transmission metadata.",
+      "additionalProperties": false,
+      "properties": {
+        "datetime_utc": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Scheduled or actual UTC transmission time (ISO 8601)."
+        },
+        "frequency_khz": {
+          "type": "number",
+          "description": "Carrier frequency in kHz."
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9]{3}$",
+          "description": "3-digit session/station identifier."
+        },
+        "group_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Declared group count (may differ from len(content.groups) when padding is used)."
+        }
+      }
+    },
+
+    "render": {
+      "type": "object",
+      "description": "Optional rendering hints for text and audio output.",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "separator": {
+              "type": "string",
+              "description": "String placed between groups, e.g. \" \" or \"-\"."
+            },
+            "line_break_every": {
+              "description": "Insert a line break after every N groups. Null means no line breaks.",
+              "oneOf": [
+                { "type": "integer", "minimum": 1 },
+                { "type": "null" }
+              ]
+            }
+          }
+        },
+        "audio": {
+          "type": "object",
+          "description": "Audio rendering preferences.",
+          "required": ["preferred"],
+          "additionalProperties": false,
+          "properties": {
+            "preferred": {
+              "type": "string",
+              "enum": ["tts", "samples"],
+              "description": "Which audio back-end to prefer when both are specified."
+            },
+            "tts": {
+              "type": "object",
+              "description": "Text-to-speech rendering preferences (reference only, no binary data).",
+              "additionalProperties": false,
+              "properties": {
+                "language_tag": {
+                  "type": "string",
+                  "description": "BCP-47 language tag, e.g. \"en-US\"."
+                },
+                "voice_id": {
+                  "type": "string",
+                  "description": "Engine-specific voice identifier."
+                },
+                "rate": {
+                  "type": "number",
+                  "description": "Relative speech rate (1.0 = normal)."
+                },
+                "pitch": {
+                  "type": "number",
+                  "description": "Relative pitch (0.0 = normal)."
+                },
+                "engine": {
+                  "type": "string",
+                  "description": "TTS engine identifier, e.g. \"espeak\" or \"polly\"."
+                }
+              }
+            },
+            "samples": {
+              "type": "object",
+              "description": "Pre-recorded sample-pack rendering preferences (reference only, no binary data).",
+              "required": ["voice_pack_id"],
+              "additionalProperties": false,
+              "properties": {
+                "voice_pack_id": {
+                  "type": "string",
+                  "description": "Identifier for the voice/sample pack to load."
+                },
+                "digit_set_id": {
+                  "type": "string",
+                  "description": "Identifier for the digit sample set within the pack."
+                },
+                "asset_base_uri": {
+                  "type": "string",
+                  "description": "Base URI from which sample assets can be fetched."
+                },
+                "silence_ms_between_digits": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Milliseconds of silence to insert between individual digits."
+                },
+                "silence_ms_between_groups": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Milliseconds of silence to insert between groups."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "integrity": {
+      "type": "object",
+      "description": "Optional integrity/checksum information.",
+      "additionalProperties": false,
+      "properties": {
+        "encoding": {
+          "type": "string",
+          "description": "Content encoding applied before hashing, e.g. \"utf-8\"."
+        },
+        "checksum": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "alg": {
+              "type": "string",
+              "description": "Hash algorithm, e.g. \"sha256\"."
+            },
+            "value": {
+              "type": "string",
+              "description": "Hex or base64-encoded digest value."
+            }
+          }
+        }
+      }
+    }
+  }
+}

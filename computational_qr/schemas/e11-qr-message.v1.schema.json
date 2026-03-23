@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://example.org/schema/e11-qr-message.v1.schema.json",
+  "title": "E11 QR Number Station Payload (v1, legacy)",
+  "type": "object",
+  "required": ["v", "station", "transmission", "message"],
+  "properties": {
+    "v": {
+      "type": "string",
+      "description": "Payload version identifier."
+    },
+    "station": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "enum": ["E11"] },
+        "nickname": { "type": "string" },
+        "family": { "type": "string" },
+        "voice": { "type": "string" },
+        "mode": { "type": "string" },
+        "location_hint": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "transmission": {
+      "type": "object",
+      "required": ["role", "variant", "session_id", "group_count"],
+      "properties": {
+        "role": { "type": "string", "enum": ["message", "null"] },
+        "variant": { "type": "string", "enum": ["E11", "E11a", "E11b", "E11c"] },
+        "datetime_utc": { "type": "string", "format": "date-time" },
+        "frequency_khz": { "type": "number" },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9]{3}$",
+          "description": "3-digit ID at start of E11 format."
+        },
+        "group_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "format": {
+          "type": "object",
+          "properties": {
+            "group_size": { "type": "integer", "enum": [5] },
+            "group_type": { "type": "string", "enum": ["numeric"] },
+            "pairing": { "type": "string", "enum": ["single", "paired"] },
+            "pause_every": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "message": {
+      "type": "object",
+      "required": ["groups"],
+      "properties": {
+        "preamble": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Typically 3-digit ID, '/', group count."
+        },
+        "attention_token": {
+          "type": "string",
+          "default": "ATTENTION"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]{5}$"
+          }
+        },
+        "outro_token": {
+          "type": "string",
+          "default": "OUT"
+        },
+        "repetitions": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "integrity": {
+      "type": "object",
+      "properties": {
+        "encoding": { "type": "string" },
+        "checksum": {
+          "type": "object",
+          "properties": {
+            "alg": { "type": "string" },
+            "value": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

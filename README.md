@@ -551,7 +551,122 @@ Generate deterministic **E11 number-station scripts** compatible with the
 format, render WAV audio from those scripts, and pipe the audio to a custom
 `ffmpeg-qr` binary.
 
-### Generating a script
+The module also ships a **profile-agnostic capsule v2** payload schema that
+can represent any groups-based number-station style (4- or 5-digit groups,
+any family/profile) alongside rendering hints for text output, TTS, and
+pre-recorded sample packs.  Legacy v1 E11 payloads are automatically upgraded
+to v2 when loaded.
+
+### Capsule v2 – overview
+
+A *capsule* is the JSON object stored in the QR code.  Version 2 separates
+concerns into four top-level keys:
+
+| Key | Required | Purpose |
+|---|---|---|
+| `v` | ✓ | Schema version (`"2"`) |
+| `content` | ✓ | The digit groups and repetition policy |
+| `profile` | – | Station-style descriptor (family, id, variant, …) |
+| `meta` | – | Transmission metadata (datetime, frequency, session_id, …) |
+| `render` | – | Text and audio rendering hints (TTS / sample-pack references) |
+| `integrity` | – | Optional checksum |
+
+JSON Schema files (draft 2019-09) live in
+`computational_qr/schemas/`:
+
+* `numberstations-capsule.v2.schema.json` – the new profile-agnostic schema.
+* `e11-qr-message.v1.schema.json` – the legacy E11-specific v1 schema
+  (kept for backwards compatibility).
+
+### Creating a capsule JSON
+
+```python
+import json
+from computational_qr.numberstation import (
+    CapsuleV2, CapsuleProfile, CapsuleContent, CapsuleMeta,
+    CapsuleRender, RenderText, RenderAudio, RenderAudioTTS, RenderAudioSamples,
+    RepeatPolicy, ContentTokens,
+)
+
+capsule = CapsuleV2(
+    v="2",
+    profile=CapsuleProfile(family="ENIGMA", id="E11", variant="E11a"),
+    content=CapsuleContent(
+        group_size=5,
+        groups=["12345", "67890", "11111"],
+        repeat=RepeatPolicy(mode="repeat-block", times=2),
+        tokens=ContentTokens(attention="ATTENTION", outro="OUT"),
+    ),
+    meta=CapsuleMeta(
+        session_id="042",
+        group_count=3,
+        datetime_utc="2026-03-23T12:00:00Z",
+        frequency_khz=6840.0,
+    ),
+    render=CapsuleRender(
+        text=RenderText(separator=" ", line_break_every=5),
+        audio=RenderAudio(
+            preferred="samples",
+            tts=RenderAudioTTS(language_tag="en-US", voice_id="carol"),
+            samples=RenderAudioSamples(
+                voice_pack_id="en-female-001",
+                silence_ms_between_digits=120,
+                silence_ms_between_groups=400,
+            ),
+        ),
+    ),
+)
+
+print(json.dumps(capsule.to_dict(), indent=2))
+```
+
+Audio assets are **never embedded**; only IDs/URIs are stored so the QR
+payload stays compact.
+
+### Loading a capsule (v1 or v2)
+
+```python
+from computational_qr.numberstation import load_capsule
+
+# Works for both v2 dicts and legacy v1 E11 payloads:
+capsule = load_capsule(json.loads(qr_payload_string))
+print(capsule.v)            # "2"
+print(capsule.content.groups)
+```
+
+### Converting a capsule to an E11 script
+
+```python
+from computational_qr.numberstation import load_capsule, capsule_to_e11_script
+
+capsule = load_capsule(payload_dict)
+script  = capsule_to_e11_script(capsule)
+print(script.to_text())
+# E11
+# 042
+# 3
+# 12345 67890 11111
+```
+
+`capsule_to_e11_script` requires either `profile.id == "E11"` or
+`content.group_size == 5` together with `meta.session_id` being set.
+
+### Rendering WAV audio from a capsule
+
+```python
+from computational_qr.numberstation import load_capsule, capsule_to_e11_script
+from computational_qr.numberstation.render import render_wav
+
+capsule   = load_capsule(payload_dict)
+script    = capsule_to_e11_script(capsule)
+wav_bytes = render_wav(script, sample_rate=48000)
+
+# The render.audio fields in the capsule indicate *which* back-end to prefer
+# ("tts" or "samples") and carry the pack/voice IDs for your application to
+# look up and load; the WAV renderer above uses the built-in tone synthesis.
+```
+
+### Generating a script (legacy path)
 
 ```python
 from computational_qr.numberstation import generate
