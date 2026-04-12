@@ -175,12 +175,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
+    from .payload import PayloadError  # local import to avoid circular reference at module level
+
     try:
         if args.command == "encode":
             cmd_encode(args)
         elif args.command == "decode":
             cmd_decode(args)
-    except Exception as exc:  # noqa: BLE001
+    except (PayloadError, OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 

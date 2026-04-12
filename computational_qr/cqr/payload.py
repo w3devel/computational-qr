@@ -17,11 +17,11 @@ Payload layout
     | graph_codec_id    | 1 byte     | identifies canonicalization algo|
     | graph_codec_ver   | 1 byte     | version within that algo        |
     | [key block]       | variable   | present when has_index_key=1    |
-    |   key_type        | 1 byte     | 0=raw, 1=uuid, 2=int, 3=path   |
+    |   key_type        | 1 byte     | 0x00=raw, 0x01=uuid, 0x02=int, 0x03=path |
     |   key_len         | varint     | byte length of key_bytes        |
     |   key_bytes       | key_len    |                                 |
     | [data block]      | variable   | present when has_embedded_data=1|
-    |   data_codec      | 1 byte     | 1=zstd, 2=gzip                  |
+    |   data_codec      | 1 byte     | 0x01=zstd, 0x02=gzip            |
     |   orig_len        | varint     | original (uncompressed) length  |
     |   comp_len        | varint     | compressed length               |
     |   comp_bytes      | comp_len   |                                 |

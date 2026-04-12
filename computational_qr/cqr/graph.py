@@ -143,10 +143,11 @@ def canonical_graph_bytes(
         raw_edges = list(graph.edges(data=True, keys=True))
         if not is_directed:
             # Normalise direction for undirected: sort (src, dst) pair
-            raw_edges = [
-                (min(_node_label(u), _node_label(v)), max(_node_label(u), _node_label(v)), k, d)
-                for u, v, k, d in raw_edges
-            ]
+            def _norm_multi(u: Any, v: Any, k: Any, d: dict) -> tuple:
+                s, t = _node_label(u), _node_label(v)
+                return (s, t, k, d) if s <= t else (t, s, k, d)
+
+            raw_edges = [_norm_multi(u, v, k, d) for u, v, k, d in raw_edges]
             raw_edges.sort(key=lambda e: (e[0], e[1], str(e[2])))
         else:
             raw_edges.sort(key=lambda e: (_node_label(e[0]), _node_label(e[1]), str(e[2])))
@@ -156,10 +157,11 @@ def canonical_graph_bytes(
     else:
         raw_edges = list(graph.edges(data=True))
         if not is_directed:
-            raw_edges = [
-                (min(_node_label(u), _node_label(v)), max(_node_label(u), _node_label(v)), d)
-                for u, v, d in raw_edges
-            ]
+            def _norm_simple(u: Any, v: Any, d: dict) -> tuple:
+                s, t = _node_label(u), _node_label(v)
+                return (s, t, d) if s <= t else (t, s, d)
+
+            raw_edges = [_norm_simple(u, v, d) for u, v, d in raw_edges]
             raw_edges.sort(key=lambda e: (e[0], e[1]))
         else:
             raw_edges.sort(key=lambda e: (_node_label(e[0]), _node_label(e[1])))
