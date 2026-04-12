@@ -56,7 +56,15 @@ computational_qr/
     ├── e11_script.py       # E11Script dataclass, generate(), CLI entry point
     ├── render.py           # WAV synthesis from E11Script (stdlib-only)
     └── ffmpeg.py           # Pipe WAV to ffmpeg-qr; auto-select APNG/PNG/WAV output
+└── cqr/                    # ← NEW: Computational QR payload + graph hashing (v0)
+    ├── hashing.py          # data_hash(bytes) → 32-byte BLAKE3 digest
+    ├── graph.py            # canonical_graph_bytes(nx_graph), graph_hash(nx_graph)
+    ├── payload.py          # Payload dataclass, pack(), unpack(), varint utilities
+    └── cli.py              # CLI: encode graph → Base64 payload; decode payload
 ```
+
+See **[docs/README_DEV.md](docs/README_DEV.md)** for the full developer guide including
+payload spec, canonicalization rules, CLI examples, and test instructions.
 
 ---
 
@@ -64,6 +72,41 @@ computational_qr/
 
 ```bash
 pip install -r requirements.txt
+```
+
+### CQR payload + canonical graph hashing (v0)
+
+```python
+import networkx as nx
+from computational_qr.cqr import data_hash, graph_hash, pack, unpack
+from computational_qr.cqr.graph import GRAPH_CODEC_ID, GRAPH_CODEC_VERSION
+from computational_qr.cqr.payload import KEY_TYPE_RAW, Payload
+
+g = nx.Graph()
+g.add_node("Alice", role="admin")
+g.add_node("Bob",   role="user")
+g.add_edge("Alice", "Bob", relation="manages")
+
+raw = b'{"event": "login", "user": "Alice"}'
+p = Payload(
+    data_hash=data_hash(raw),
+    graph_hash=graph_hash(g),
+    graph_codec_id=GRAPH_CODEC_ID,
+    graph_codec_version=GRAPH_CODEC_VERSION,
+    embedded_data=raw,
+    key_type=KEY_TYPE_RAW,
+    key_bytes=b"rec:0042",
+)
+payload_bytes = pack(p)          # deterministic binary blob
+recovered     = unpack(payload_bytes)
+assert recovered.embedded_data == raw
+```
+
+CLI encode/decode:
+
+```bash
+python -m computational_qr.cqr.cli encode graph.json --data data.bin --key mykey
+python -m computational_qr.cqr.cli decode <BASE64_PAYLOAD> --out recovered.bin
 ```
 
 ### Colour geometry & 3D graph
