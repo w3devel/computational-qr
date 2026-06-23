@@ -968,9 +968,75 @@ JS wrapper emits a clear error message suggesting the user install the native
 Rust helper server.  See [docs/native-server-fallback.md](docs/native-server-fallback.md)
 for the design.
 
+# Project FluidQR: High-Density Visible Light Communication (VLC) via Predictive Wavefront Engineering
+
+An open-source framework exploring the intersection of **Underwater Li-Fi**, **Computational QR Architectures**, and **Fluid-Dynamic Phase Conjugation**. 
+
+The goal of this project is to develop a software-defined optical communication system that doesn't just *fight* environmental distortion (like moving seawater or atmospheric haze)—it uses the environment's chaotic movement as a dynamic modulation lens to achieve unprecedented data density.
+
+---
+
+## 💡 The Core Thesis
+
+Traditional Underwater Optical Wireless Communication (UOWC) treats the ocean as an enemy. Turbidity, thermal currents, and water movement warp light beams, causing massive attenuation and packet loss. 
+
+**FluidQR flips the script.** By treating turbulent water like a fluid "Lava Lamp" entropy source, we map the environmental distortions in real-time, pre-distort the data payload at the transmitter, and utilize computational imaging principles to force the data to perfectly reconstruct *only* where the light vectors intersect.
+
+[ Transmitter Array ]
+             /          |          \
+ (Pre-warped Wavefronts fired through moving water)
+           /            |            \
+          ~ ~ ~ Turbulent Water ~ ~ ~
+           \            |            /
+             \          |          /
+         [ Intersecting Focal Coordinates ]
+                        |
+             (Perfect Data Synthesis)
+                        |
+               [ Receiver Matrix ]
+
+---
+
+## 🛠️ Architectural Pillars
+
+### 1. The Blue-Green Spectral Map
+To pierce the hydro-acoustic window of seawater, the system maps high-frequency data streams strictly within the **540 THz to 670 THz** frequency bands (approx. $450\text{ nm} - 550\text{ nm}$).
+
+### 2. Predictive Wavefront Pre-Distortion
+* **Channel State Information (CSI):** The transmitter fires rapid, un-modulated probe beams to calculate an inverse-distortion matrix of the water vectors milliseconds before transmission.
+* **Phase Conjugation:** The system purposely warps the spatial geometry of the light stream in reverse, allowing the natural physics of the moving water to "uncrumple" the data beam as it travels.
+
+### 3. Computational Data Intersections
+Building heavily on computational QR and plenoptic photography concepts:
+* Data is geometrically sliced and distributed across multiple beam paths.
+* A single beam contains fragments; **the complete QR/data payload only synthesizes at the exact coordinate matrix where the beams intersect.**
+* This isolates the data from organic scattering (plankton blur) and provides physical, zero-knowledge security.
+
+---
+
+## 🧠 Who We Are Looking For
+
+This project is currently in its conceptual and algorithmic modeling phase. We have the vision, but we need more brains, contributors, and peer-reviewers to turn the math into code. We are looking for:
+
+* **Computational Photography & Imaging Engineers:** Experts in deconvolution algorithms, light-field/plenoptic sensing, and wavefront shaping.
+* **Optical Physicists & Wireless Communication Researchers:** People who understand Spatial Light Modulators (SLMs), Orbital Angular Momentum (OAM) multiplexing, and laser propagation in turbid mediums.
+* **Embedded & Software-Defined Radio (SDR) Devs:** Engineers capable of prototyping high-frequency FPGA-driven LED/laser modulation.
+* **Cryptographers:** To explore the security implications of spatially anchored, volumetric data intersection keys.
+
+---
+
+## 🚀 How to Contribute
+
+1. **Review the Specs:** Check out the `/docs` folder for our initial frequency-to-color mapping tables and channel state estimation theories.
+2. **Open an Issue:** Got a critique of our fluid-lens math? Have a suggestion for the hardware stack? Open an issue and let's debate it.
+3. **Simulate:** We are currently building a Python-based simulation environment to model light-scattering through dynamic fluid fields. Check out `/simulation` to get your hands dirty.
+
+---
+
+> *"The medium is not the obstacle; the medium is the machine."*
+
 ---
 
 ## License
 
 GNU Affero General Public License v3 – see [LICENSE](LICENSE).
-
